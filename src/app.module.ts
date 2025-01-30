@@ -5,6 +5,7 @@ import { SchedulerService } from './scheduler/scheduler.service';
 import { ConfigModule } from '@nestjs/config';
 import { ScrapperService } from './scrapper/scrapper.service';
 import { EmailService } from './email/email.service';
+import { ScrapperController } from './scrapper.controller';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { EmailService } from './email/email.service';
       isGlobal: true,
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, ScrapperController],
   providers: [AppService, SchedulerService, ScrapperService, EmailService],
 })
 export class AppModule {}
