@@ -117,6 +117,7 @@ export class ScrapperService implements OnModuleInit {
   ): Promise<any[]> {
     const baseUrl = `https://lista.mercadolivre.com.br/${category}`;
     let nextPageUrl = baseUrl;
+    let totalItems = 0;
     const scrapedResult: ScrappedItemDto[] = [];
 
     try {
@@ -135,6 +136,7 @@ export class ScrapperService implements OnModuleInit {
 
         // Scrape the current page
         $('.ui-search-layout__item').each((_, element) => {
+          totalItems++;
           const seller = $(element)
             .find('.poly-component__seller')
             .text()
@@ -183,11 +185,11 @@ export class ScrapperService implements OnModuleInit {
       );
 
       this.logger.log(
-        `Scraping result:\nTotal items: ${scrapedResult.length}\nUnique sellers: ${uniqueSellers.length}`,
+        `Scraping finished!\nTotal items count: ${totalItems}\nItems with verified seller: ${scrapedResult.length}\nUnique sellers: ${uniqueSellers.length}`,
       );
 
       // Create CSV file
-      this.createCSV(uniqueSellers);
+      this.processCSV(uniqueSellers);
 
       return uniqueSellers;
     } catch (error) {
@@ -196,9 +198,10 @@ export class ScrapperService implements OnModuleInit {
     }
   }
 
-  private createCSV(data: ScrappedItemDto[]): void {
+  private processCSV(data: ScrappedItemDto[]): void {
+    const csvDelimiter = ';';
     const csvHeaders = ['Title', 'Price', 'Seller', 'Link'];
-    const filePath = path.join(__dirname, '..', 'scraped_results.csv');
+    const filePath = path.join(__dirname, '../..', 'scraped_results.csv');
 
     let existingSellers: Set<string> = new Set();
     let existingContent = '';
@@ -212,7 +215,7 @@ export class ScrapperService implements OnModuleInit {
       const rows = existingContent.split('\n').slice(1); // Skip the header row
       rows.forEach((row) => {
         if (row.trim()) {
-          const [, , seller] = row.split(',');
+          const [, , seller] = row.split(csvDelimiter); // Use semicolon as delimiter
           existingSellers.add(seller);
         }
       });
@@ -235,7 +238,7 @@ export class ScrapperService implements OnModuleInit {
     ]);
 
     const csvContent = [
-      ...csvRows.map((row) => row.join(',')), // New data rows
+      ...csvRows.map((row) => row.join(csvDelimiter)), // Use semicolon as delimiter
     ].join('\n');
 
     // Append new data to the existing CSV file (or create a new one if it doesn't exist)
@@ -244,7 +247,7 @@ export class ScrapperService implements OnModuleInit {
     } else {
       fs.writeFileSync(
         filePath,
-        csvHeaders.join(',') + '\n' + csvContent,
+        csvHeaders.join(csvDelimiter) + '\n' + csvContent, // Use semicolon as delimiter
         'utf-8',
       ); // Create new file with headers
     }

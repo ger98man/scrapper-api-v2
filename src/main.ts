@@ -7,4 +7,5 @@ async function bootstrap() {
 
   console.log('App working on:', await app.getUrl());
 }
-bootstrap();
+
+void bootstrap();
