@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Post, Req } from '@nestjs/common';
 import { ScrapperService } from './scrapper/scrapper.service';
 
 @Controller('scrapper')
@@ -14,9 +14,12 @@ export class ScrapperController {
     return await this.scrapperService.scrapePage220LV();
   }
 
-  @Get('mercado')
-  async scrapeMercado() {
+  @Post('mercado')
+  async scrapeMercado(@Req() req: any): Promise<any[]> {
     this.logger.log('Starting scrape for Mercado');
-    return await this.scrapperService.scrapePageMercado();
+    return await this.scrapperService.scrapePageMercado(
+      req.body.category,
+      req.body.limit,
+    );
   }
 }

@@ -3,6 +3,8 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../email/email.service';
 import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class ScrapperService implements OnModuleInit {
@@ -102,46 +104,112 @@ export class ScrapperService implements OnModuleInit {
     }
   }
 
-  public async scrapePageMercado(): Promise<any[]> {
-    const searchUrl = 'https://lista.mercadolivre.com.br';
+  public async scrapePageMercado(
+    category: string,
+    limit: number,
+  ): Promise<any[]> {
+    const baseUrl = `https://lista.mercadolivre.com.br/${category}`;
+    let nextPageUrl = baseUrl;
+    const scrapedResult: any[] = [];
 
     try {
-      this.logger.log(`Scraping Mercado page: ${searchUrl}`);
-      const apiResult = await this.scraperApiClient.get(searchUrl);
-      if (!apiResult || apiResult.statusCode !== 200) {
-        this.logger.error(
-          `Failed to fetch Mercado page, status: ${apiResult?.statusCode}`,
+      while (nextPageUrl) {
+        this.logger.log(`Scraping Mercado page: ${nextPageUrl}`);
+        const apiResult = await this.scraperApiClient.get(nextPageUrl);
+
+        if (!apiResult || apiResult.statusCode !== 200) {
+          this.logger.error(
+            `Failed to fetch Mercado page, status: ${apiResult?.statusCode}`,
+          );
+          break;
+        }
+
+        const $ = cheerio.load(apiResult.body);
+
+        // Scrape the current page
+        $('.ui-search-layout__item').each((_, element) => {
+          const seller = $(element)
+            .find('.poly-component__seller')
+            .text()
+            .trim();
+          if (seller) {
+            const title = $(element)
+              .find('.poly-component__title')
+              .text()
+              .trim();
+            const price = $(element).find('.poly-price__current').text().trim();
+            const link = $(element).find('a').attr('href');
+
+            scrapedResult.push({ title, price, seller, link });
+          }
+        });
+
+        // Filter unique sellers
+        const uniqueSellers = scrapedResult.filter(
+          (item, index, self) =>
+            index === self.findIndex((obj) => obj.seller === item.seller),
         );
-        return [];
+
+        // Stop scraping if unique seller count reaches limit
+        if (uniqueSellers.length >= limit) {
+          this.logger.log(
+            `Unique seller count reached ${limit}. Stopping scraping.`,
+          );
+          break;
+        }
+
+        // Check if there is a next page
+        const nextPageLink = $(
+          'a.andes-pagination__link:contains("Seguinte")',
+        ).attr('href');
+        if (nextPageLink) {
+          nextPageUrl = nextPageLink; // Update the URL for the next page
+        } else {
+          nextPageUrl = ''; // No more pages, exit the loop
+        }
       }
 
-      const $ = cheerio.load(apiResult.body);
-
-      let totalCount = 0;
-      const scrapedResult: any[] = [];
-      $('.ui-search-layout__item').each((_, element) => {
-        totalCount++;
-        const seller = $(element).find('.poly-component__seller').text().trim();
-        if (seller) {
-          const title = $(element).find('.poly-component__title').text().trim();
-          const price = $(element).find('.poly-price__current').text().trim();
-          const link = $(element).find('a').attr('href');
-
-          scrapedResult.push({ title, price, seller, link });
-        }
-      });
+      // Final unique sellers
       const uniqueSellers = scrapedResult.filter(
         (item, index, self) =>
           index === self.findIndex((obj) => obj.seller === item.seller),
       );
 
       this.logger.log(
-        `Scrapping result:\nTotal items: ${totalCount}\nTotal with seller: ${scrapedResult.length}\nUnique seller: ${uniqueSellers.length}`,
+        `Scraping result:\nTotal items: ${scrapedResult.length}\nUnique sellers: ${uniqueSellers.length}`,
       );
-      return scrapedResult;
+
+      // Create CSV file
+      this.createCSV(uniqueSellers);
+
+      return uniqueSellers;
     } catch (error) {
-      this.logger.error(`Error scraping Mercado page ${searchUrl}:`, error);
+      this.logger.error(`Error scraping Mercado page:`, error);
       return [];
     }
+  }
+
+  private createCSV(data: any[]): void {
+    const csvHeaders = ['Title', 'Price', 'Seller', 'Link'];
+    const csvRows = data.map((item) => [
+      item.title,
+      item.price,
+      item.seller,
+      item.link,
+    ]);
+
+    // Convert to CSV format
+    const csvContent = [
+      csvHeaders.join(','), // Header row
+      ...csvRows.map((row) => row.join(',')), // Data rows
+    ].join('\n');
+
+    // Define file path
+    const filePath = path.join(__dirname, '..', 'scraped_results.csv');
+
+    // Write to file
+    fs.writeFileSync(filePath, csvContent, 'utf-8');
+
+    this.logger.log(`CSV file created at: ${filePath}`);
   }
 }
