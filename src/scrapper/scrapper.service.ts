@@ -185,7 +185,7 @@ export class ScrapperService implements OnModuleInit {
       );
 
       this.logger.log(
-        `Scraping finished!\nTotal items count: ${totalItems}\nItems with verified seller: ${scrapedResult.length}\nUnique sellers: ${uniqueSellers.length}`,
+        `Scraping finished!\nCategory: ${category}\nTotal items count: ${totalItems}\nItems with verified seller: ${scrapedResult.length}\nUnique sellers: ${uniqueSellers.length}`,
       );
 
       // Create CSV file
