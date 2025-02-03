@@ -191,25 +191,57 @@ export class ScrapperService implements OnModuleInit {
 
   private createCSV(data: any[]): void {
     const csvHeaders = ['Title', 'Price', 'Seller', 'Link'];
-    const csvRows = data.map((item) => [
+    const filePath = path.join(__dirname, '..', 'scraped_results.csv');
+
+    let existingSellers: Set<string> = new Set();
+    let existingContent = '';
+
+    // Check if the CSV file already exists
+    if (fs.existsSync(filePath)) {
+      // Read the existing CSV file
+      existingContent = fs.readFileSync(filePath, 'utf-8');
+
+      // Extract sellers from the existing CSV
+      const rows = existingContent.split('\n').slice(1); // Skip the header row
+      rows.forEach((row) => {
+        if (row.trim()) {
+          const [, , seller] = row.split(',');
+          existingSellers.add(seller);
+        }
+      });
+    }
+
+    // Filter out sellers that are already in the CSV
+    const newData = data.filter((item) => !existingSellers.has(item.seller));
+
+    if (newData.length === 0) {
+      this.logger.log('No new unique sellers to add to the CSV.');
+      return;
+    }
+
+    // Convert new data to CSV format
+    const csvRows = newData.map((item) => [
       item.title,
       item.price,
       item.seller,
       item.link,
     ]);
 
-    // Convert to CSV format
     const csvContent = [
-      csvHeaders.join(','), // Header row
-      ...csvRows.map((row) => row.join(',')), // Data rows
+      ...csvRows.map((row) => row.join(',')), // New data rows
     ].join('\n');
 
-    // Define file path
-    const filePath = path.join(__dirname, '..', 'scraped_results.csv');
+    // Append new data to the existing CSV file (or create a new one if it doesn't exist)
+    if (existingContent) {
+      fs.appendFileSync(filePath, '\n' + csvContent, 'utf-8'); // Append with a new line
+    } else {
+      fs.writeFileSync(
+        filePath,
+        csvHeaders.join(',') + '\n' + csvContent,
+        'utf-8',
+      ); // Create new file with headers
+    }
 
-    // Write to file
-    fs.writeFileSync(filePath, csvContent, 'utf-8');
-
-    this.logger.log(`CSV file created at: ${filePath}`);
+    this.logger.log(`CSV file updated at: ${filePath}`);
   }
 }
