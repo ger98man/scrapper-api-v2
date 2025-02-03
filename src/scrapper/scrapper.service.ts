@@ -6,6 +6,13 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface ScrappedItemDto {
+  title: string;
+  price: string;
+  seller: string;
+  link?: string;
+}
+
 @Injectable()
 export class ScrapperService implements OnModuleInit {
   private scraperApiClient: any;
@@ -110,7 +117,7 @@ export class ScrapperService implements OnModuleInit {
   ): Promise<any[]> {
     const baseUrl = `https://lista.mercadolivre.com.br/${category}`;
     let nextPageUrl = baseUrl;
-    const scrapedResult: any[] = [];
+    const scrapedResult: ScrappedItemDto[] = [];
 
     try {
       while (nextPageUrl) {
@@ -189,7 +196,7 @@ export class ScrapperService implements OnModuleInit {
     }
   }
 
-  private createCSV(data: any[]): void {
+  private createCSV(data: ScrappedItemDto[]): void {
     const csvHeaders = ['Title', 'Price', 'Seller', 'Link'];
     const filePath = path.join(__dirname, '..', 'scraped_results.csv');
 
